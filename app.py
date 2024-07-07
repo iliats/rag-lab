@@ -4,10 +4,13 @@ import core
 
 # Page title
 st.set_page_config(page_title='Docktor AI_bolit', page_icon='💊')
-st.title('🩺 **Docktor** :red[AI]**bolit**')
+st.title('🩺 :red[AI]**bolit**')
 
-uploaded_file = st.file_uploader('Upload a file', type='pdf')
-query_text = st.text_input('Enter your question:', placeholder = 'Please provide a short summary.', disabled=not uploaded_file)
+uploaded_file = st.file_uploader("Upload a file", type="pdf")
+if not uploaded_file:
+    st.session_state["query"] = ""
+
+query_text = st.text_input("Enter your question:", key="query", placeholder="Please provide a short summary.", disabled=not uploaded_file)
 
 if query_text:
     with st.spinner('Calculating...'):

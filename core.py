@@ -13,9 +13,14 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
+llm = None
+embeddings = None
 
-def init():
-    set_debug(False)
+
+def init() -> (AzureChatOpenAI, AzureOpenAIEmbeddings):
+    global llm, embeddings
+
+    set_debug(True)
     set_verbose(True)
 
     embeddings = AzureOpenAIEmbeddings(
@@ -32,7 +37,7 @@ def init():
         temperature=config.TEMPERATURE,
         max_tokens=config.MAX_TOKENS,
     )
-    return embeddings, llm
+    return llm, embeddings
 
 
 def load_file_pages(uploaded_file: io.BytesIO) -> list[Document]:
@@ -56,26 +61,29 @@ def get_prompt() -> PromptTemplate:
     return PromptTemplate(template=prompt_template, input_variables=["context", "question"])
 
 
-def format_docs(docs):
+def format_docs(docs: list[Document]):
     return "\n\n".join(doc.page_content for doc in docs)
 
 
 def generate(uploaded_file: io.BytesIO, query: str) -> str:
-    if uploaded_file:
-        embeddings, llm = init()
+    if not uploaded_file:
+        return ""
 
-        pages = load_file_pages(uploaded_file)
-        chroma_db = Chroma.from_documents(documents=pages, embedding=embeddings)
-        retriever = chroma_db.as_retriever()
-        prompt = get_prompt()
+    global llm, embeddings
+    if not llm or not embeddings:
+        llm, embeddings = init()
 
-        rag_chain = (
-            {"context": retriever | format_docs, "question": RunnablePassthrough()}
-            | prompt
-            | llm
-            | StrOutputParser()
-        )
+    pages = load_file_pages(uploaded_file)
+    chroma_db = Chroma.from_documents(documents=pages, embedding=embeddings)
+    retriever = chroma_db.as_retriever()
+    prompt = get_prompt()
 
-        res = rag_chain.invoke(query)
-        return res
-    return "failed to parse file"
+    rag_chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    res = rag_chain.invoke(query)
+    return res
